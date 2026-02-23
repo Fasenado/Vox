@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <title>VoxWorld by Claw</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+
+    <script src="libs/three.min.js"></script>
+    <script src="libs/Stats.js"></script>
+    <script src="libs/jquery-1.11.1.min.js"></script>
+    <script src="libs/THREEx.KeyboardState.js"></script>
+    <script src="libs/THREEx.WindowResize.js"></script>
+    <style>
+@font-face { font-family: vox; src: url(gui/gui1/vox.ttf); }
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+    background: #08090d;
+    color: #c8ccd4;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    text-align: center;
+    overflow: hidden;
+    height: 100%;
+    width: 100%;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.vox_font { font-family: vox, monospace; }
+
+/* ===== LANDING PAGE ===== */
+
+#landing {
+    position: fixed; inset: 0; z-index: 1000;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at 50% 20%, #131825 0%, #08090d 70%);
+    overflow: hidden;
+}
+
+#landing::before {
+    content: '';
+    position: absolute; inset: 0;
+    background:
+        linear-gradient(90deg, transparent 49.8%, rgba(99,102,241,0.03) 50%, transparent 50.2%),
+        linear-gradient(0deg,  transparent 49.8%, rgba(99,102,241,0.03) 50%, transparent 50.2%);
+    background-size: 60px 60px;
+    animation: gridMove 20s linear infinite;
+}
+@keyframes gridMove {
+    0%   { transform: translate(0, 0); }
+    100% { transform: translate(60px, 60px); }
+}
+
+#landing .glow-orb {
+    position: absolute; width: 400px; height: 400px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%);
+    filter: blur(60px); pointer-events: none;
+    animation: orbFloat 8s ease-in-out infinite alternate;
+}
+#landing .glow-orb:nth-child(2) { left: 20%; top: 30%; animation-delay: -3s; }
+#landing .glow-orb:nth-child(3) { right: 15%; top: 50%; animation-delay: -6s; background: radial-gradient(circle, rgba(236,72,153,0.08) 0%, transparent 70%); }
+@keyframes orbFloat {
+    0%   { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(30px, -40px) scale(1.15); }
+}
+
+.landing-content {
+    position: relative; z-index: 1;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    max-width: 520px; width: 90%;
+}
+
+.badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 14px; border-radius: 20px;
+    background: rgba(99,102,241,0.1);
+    border: 1px solid rgba(99,102,241,0.25);
+    font-size: 11px; font-weight: 600; letter-spacing: 1.5px;
+    color: #818cf8; text-transform: uppercase;
+}
+.badge .pulse-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #34d399;
+    box-shadow: 0 0 6px #34d399;
+    animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: 0.5; transform: scale(0.8); }
+}
+
+.title-row {
+    display: flex; align-items: baseline; gap: 12px;
+    margin: 10px 0 2px;
+}
+.title-row h1 {
+    font-family: vox, monospace;
+    font-size: 52px; font-weight: 900;
+    background: linear-gradient(135deg, #e0e7ff 0%, #818cf8 50%, #c084fc 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; line-height: 1;
+}
+.title-row .ai-tag {
+    font-size: 18px; font-weight: 700;
+    padding: 3px 10px; border-radius: 6px;
+    background: linear-gradient(135deg, #6366f1, #a855f7);
+    color: #fff;
+    letter-spacing: 1px;
+    position: relative; top: -20px;
+}
+
+.subtitle {
+    font-size: 15px; color: #64748b;
+    margin-bottom: 20px; font-weight: 400;
+}
+
+/* Status panel */
+.status-panel {
+    width: 100%; padding: 16px 20px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    display: flex; flex-direction: column; gap: 10px;
+    margin-bottom: 24px; text-align: left;
+}
+.status-row {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; color: #94a3b8;
+}
+.status-row .dot {
+    width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.dot-green  { background: #34d399; box-shadow: 0 0 6px #34d39966; }
+.dot-blue   { background: #60a5fa; box-shadow: 0 0 6px #60a5fa66; }
+.dot-amber  { background: #fbbf24; box-shadow: 0 0 6px #fbbf2466; }
+.dot-purple { background: #a78bfa; box-shadow: 0 0 6px #a78bfa66; }
+
+.status-row span.val { color: #e2e8f0; font-weight: 600; }
+
+/* Join form */
+.join-form {
+    width: 100%;
+    display: flex; flex-direction: column; gap: 12px;
+}
+
+.join-form input {
+    width: 100%; padding: 14px 18px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    color: #e2e8f0; font-size: 15px;
+    outline: none; transition: all 0.2s;
+}
+.join-form input::placeholder { color: #475569; }
+.join-form input:focus {
+    border-color: rgba(99,102,241,0.5);
+    background: rgba(99,102,241,0.05);
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+}
+
+.join-btn {
+    width: 100%; padding: 15px;
+    background: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
+    border: none; border-radius: 10px;
+    color: #fff; font-size: 16px; font-weight: 700;
+    letter-spacing: 1px; cursor: pointer;
+    transition: all 0.25s; text-transform: uppercase;
+    position: relative; overflow: hidden;
+}
+.join-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 30px rgba(99,102,241,0.35);
+}
+.join-btn:active { transform: translateY(0); }
+.join-btn:disabled {
+    opacity: 0.5; cursor: not-allowed; transform: none;
+    box-shadow: none;
+}
+
+.join-btn .btn-shimmer {
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+    transform: translateX(-100%);
+    animation: shimmer 3s infinite;
+}
+@keyframes shimmer {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.lore-text {
+    font-size: 12px; color: #475569; line-height: 1.6;
+    margin-top: 18px; max-width: 400px;
+}
+.lore-text strong { color: #6366f1; font-weight: 600; }
+
+.social-links {
+    margin-top: 20px; width: 100%;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+}
+
+.social-links .twitter-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 20px; border-radius: 8px;
+    background: rgba(29,155,240,0.1);
+    border: 1px solid rgba(29,155,240,0.25);
+    color: #1d9bf0; font-size: 13px; font-weight: 600;
+    text-decoration: none; transition: all 0.2s;
+}
+.social-links .twitter-btn:hover {
+    background: rgba(29,155,240,0.2);
+    border-color: rgba(29,155,240,0.4);
+    transform: translateY(-1px);
+}
+.social-links .twitter-btn svg { width: 16px; height: 16px; fill: currentColor; flex-shrink: 0; }
+
+.ca-box {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 14px; border-radius: 8px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    max-width: 100%; overflow: hidden;
+}
+.ca-box .ca-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 1px;
+    color: #6366f1; white-space: nowrap; text-transform: uppercase;
+}
+.ca-box .ca-addr {
+    font-size: 11px; color: #64748b; font-family: 'Consolas', 'Monaco', monospace;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    cursor: pointer; transition: color 0.2s;
+}
+.ca-box .ca-addr:hover { color: #e2e8f0; }
+.ca-box .ca-copy {
+    background: none; border: 1px solid rgba(255,255,255,0.1);
+    color: #64748b; padding: 3px 8px; border-radius: 4px;
+    font-size: 10px; cursor: pointer; white-space: nowrap;
+    transition: all 0.2s;
+}
+.ca-box .ca-copy:hover { border-color: #6366f1; color: #818cf8; }
+
+.footer-links {
+    margin-top: 10px;
+    display: flex; gap: 16px; justify-content: center;
+}
+.footer-links a {
+    font-size: 11px; color: #475569; text-decoration: none;
+    transition: color 0.2s;
+}
+.footer-links a:hover { color: #818cf8; }
+
+/* ===== CONNECTING OVERLAY ===== */
+
+#connecting-overlay {
+    position: fixed; inset: 0; z-index: 2000;
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    background: #08090d; gap: 20px;
+}
+#connecting-overlay.active { display: flex; }
+
+.connect-spinner {
+    width: 48px; height: 48px; border-radius: 50%;
+    border: 3px solid rgba(99,102,241,0.15);
+    border-top-color: #6366f1;
+    animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.connect-text {
+    font-size: 14px; color: #94a3b8;
+    max-width: 300px; text-align: center;
+}
+.connect-text .highlight { color: #818cf8; font-weight: 600; }
+.connect-step {
+    font-size: 12px; color: #475569;
+    margin-top: 4px;
+    animation: fadeInUp 0.4s ease;
+}
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== GAME HUD ===== */
+
+#game-hud {
+    position: fixed; z-index: 500; inset: 0;
+    pointer-events: none; display: none;
+}
+
+#player-tag {
+    position: absolute; top: 12px; left: 12px;
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 14px; border-radius: 8px;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.08);
+    backdrop-filter: blur(8px);
+}
+#player-tag .tag-dot { width: 6px; height: 6px; border-radius: 50%; background: #34d399; box-shadow: 0 0 8px #34d399; }
+#player-tag .tag-name { font-size: 13px; font-weight: 600; color: #e2e8f0; }
+
+#ai-chat {
+    position: absolute; bottom: 70px; left: 12px;
+    display: flex; flex-direction: column; gap: 4px;
+    max-width: 360px; pointer-events: none;
+}
+.ai-msg {
+    padding: 6px 12px; border-radius: 8px;
+    background: rgba(0,0,0,0.55);
+    border: 1px solid rgba(255,255,255,0.06);
+    backdrop-filter: blur(6px);
+    font-size: 12px; color: #94a3b8; text-align: left;
+    animation: msgFade 8s forwards;
+    max-width: 100%;
+}
+.ai-msg .ai-name { color: #818cf8; font-weight: 600; margin-right: 6px; }
+.ai-msg .ai-name.lord { color: #f87171; }
+.ai-msg .ai-name.princess { color: #f0abfc; }
+.ai-msg .ai-label {
+    font-size: 9px; color: #6366f1; background: rgba(99,102,241,0.15);
+    padding: 1px 5px; border-radius: 3px; margin-right: 4px;
+    font-weight: 600;
+}
+@keyframes msgFade {
+    0%, 70% { opacity: 1; }
+    100%    { opacity: 0; }
+}
+
+#ai-agents-nearby {
+    position: absolute; top: 12px; right: 12px;
+    padding: 6px 14px; border-radius: 8px;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.08);
+    backdrop-filter: blur(8px);
+    font-size: 11px; color: #94a3b8;
+    display: flex; align-items: center; gap: 6px;
+}
+#ai-agents-nearby .claude-icon {
+    font-size: 10px; color: #a78bfa; font-weight: 700;
+    padding: 1px 5px; border-radius: 3px;
+    background: rgba(167,139,250,0.15);
+}
+
+/* ===== GAME AREA (original game styling) ===== */
+
+#main {
+    text-align: center;
+    width: 100%; height: 100%;
+    position: fixed; inset: 0;
+}
+
+#stats { position: absolute; margin-bottom: 0; z-index: 600; }
+
+#weapons {
+    position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
+    z-index: 550; width: 160px; height: 55px;
+}
+#weapons .w-slot {
+    position: absolute; top: 0; width: 50px; height: 50px; text-align: center;
+}
+#weapons .w-slot:nth-child(1) { left: 0; }
+#weapons .w-slot:nth-child(2) { left: 54px; }
+#weapons .w-slot:nth-child(3) { left: 108px; }
+#weapons .w-slot img { width: 50px; height: 50px; }
+#weapons .w-slot .wkey {
+    position: absolute; top: -18px; left: 0; width: 100%;
+    font-family: vox, monospace; font-size: 24px; color: #000;
+    text-shadow: 1px 1px 2px rgba(255,255,255,0.3);
+}
+
+/* Original game status labels */
+#statusCenter {
+    position: fixed; top: 40px; left: 0; width: 100%;
+    text-shadow: 1px 1px #000; display: none;
+    font-size: 26px; color: #FF3333; opacity: 0.9; z-index: 500;
+}
+#statusCenter.vox_font { font-family: vox, monospace; }
+
+#status {
+    position: fixed; top: 8px; left: 0; width: 100%;
+    text-shadow: 1px 1px #000; display: none;
+    font-size: 22px; color: #FDD017; opacity: 0.9; z-index: 500;
+}
+
+#statusEnemies {
+    position: fixed; top: 34px; left: 0; width: 100%;
+    text-shadow: 1px 1px #000; display: none;
+    font-size: 18px; color: #FFA017; opacity: 0.9; z-index: 500;
+}
+
+.sound-controls {
+    position: fixed; bottom: 8px; right: 12px; z-index: 600;
+    display: flex; gap: 10px;
+}
+.sound-controls a {
+    font-size: 12px; color: #64748b; text-decoration: none;
+    display: flex; align-items: center; gap: 4px;
+    transition: color 0.2s;
+}
+.sound-controls a:hover { color: #e2e8f0; }
+    </style>
+  </head>
+  <body>
+
+<audio id="song" autoplay loop>
+    <source src="sound/intro3.mp3" type="audio/mpeg">
+</audio>
+
+<!-- ===== LANDING PAGE ===== -->
+<div id="landing">
+    <div class="glow-orb"></div>
+    <div class="glow-orb"></div>
+    <div class="glow-orb"></div>
+
+    <div class="landing-content">
+        <div class="badge"><span class="pulse-dot"></span> VoxWorld by Claw &mdash; AI Agents Online</div>
+
+        <div class="title-row">
+            <h1>VOXWORLD</h1>
+            <span class="ai-tag">AI</span>
+        </div>
+
+        <p class="subtitle">A persistent voxel world inhabited by autonomous AI agents</p>
+
+        <div class="status-panel">
+            <div class="status-row"><span class="dot dot-green"></span> <span class="val" id="s-lords">4</span>&nbsp;AI Lords defending their territories</div>
+            <div class="status-row"><span class="dot dot-blue"></span> <span class="val" id="s-agents">19</span>&nbsp;AI agents active in the world</div>
+            <div class="status-row"><span class="dot dot-amber"></span> World generation: <span class="val" id="s-gen">Epoch 2,847</span></div>
+            <div class="status-row"><span class="dot dot-purple"></span> <span class="val" id="s-players">3</span>&nbsp;players exploring right now</div>
+        </div>
+
+        <div class="join-form">
+            <input type="text" id="nickname" placeholder="Enter your name, warrior..." maxlength="16" autocomplete="off" spellcheck="false">
+            <button class="join-btn" id="joinBtn" onclick="JoinWorld()">
+                <span class="btn-shimmer"></span>
+                JOIN WORLD
+            </button>
+        </div>
+
+        <p class="lore-text">
+            Every creature in this world is an <strong>autonomous AI agent</strong> powered by Claw.
+            Each Lord has unique personality, memory and combat strategy.
+            They learn from every encounter. They adapt. <strong>They remember you.</strong>
+        </p>
+
+        <div class="social-links">
+            <a class="twitter-btn" href="https://x.com/voxlord" target="_blank" rel="noopener">
+                <svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                @voxlord
+            </a>
+            <div class="ca-box">
+                <span class="ca-label">CA</span>
+                <span class="ca-addr" id="ca-addr" title="Click to copy">hAMJ9iFMcCN3tsJ3YXuWMZTQ7eA7zxSim6sWftLpump</span>
+                <button class="ca-copy" onclick="copyCA()">Copy</button>
+            </div>
+        </div>
+
+        <div class="footer-links">
+            <a href="javascript:void(0)" onclick="MuteSong();" id="muteSong">Music: ON</a>
+            <a href="javascript:void(0)" onclick="MuteSound();" id="muteSound">Sound: ON</a>
+        </div>
+    </div>
+</div>
+
+<!-- ===== CONNECTING OVERLAY ===== -->
+<div id="connecting-overlay">
+    <div class="connect-spinner"></div>
+    <div class="connect-text">
+        Connecting as <span class="highlight" id="connect-name"></span>
+    </div>
+    <div id="connect-steps"></div>
+</div>
+
+<!-- ===== GAME HUD ===== -->
+<div id="game-hud">
+    <div id="player-tag">
+        <span class="tag-dot"></span>
+        <span class="tag-name" id="hud-name"></span>
+    </div>
+    <div id="ai-agents-nearby">
+        <span class="claude-icon">Claw</span>
+        <span id="nearby-count">0 agents nearby</span>
+    </div>
+    <div id="ai-chat"></div>
+</div>
+
+<!-- ===== GAME AREA ===== -->
+<div style="position: absolute; margin-bottom: 0;" id="stats"></div>
+
+<div id="main" style="display:none;">
+    <p id="statusCenter" class="vox_font"></p>
+    <p id="status" class="vox_font"></p>
+    <p id="statusEnemies" class="vox_font"></p>
+    <div style="position: relative; z-index: 1;" id="container"></div>
+</div>
+
+<div id="weapons" style="display:none;">
+    <div class="w-slot">
+        <img id="weapon1" src="gui/gui1/smallshot.png"/>
+        <span class="wkey">1</span>
+    </div>
+    <div class="w-slot">
+        <img id="weapon2" style="opacity:0.3" src="gui/gui1/tromb.png"/>
+        <span class="wkey">2</span>
+    </div>
+    <div class="w-slot">
+        <img id="weapon3" style="opacity:0.3" src="gui/gui1/bomb.png"/>
+        <span class="wkey">3</span>
+    </div>
+</div>
+
+<div class="sound-controls" id="game-sound-controls" style="display:none;">
+    <a href="javascript:MuteSound();" id="muteSound2">Sound: ON</a>
+    <a href="javascript:MuteSong();" id="muteSong2">Music: ON</a>
+</div>
+
+<!-- ===== GAME SCRIPTS ===== -->
+<script src="js/utils.js"></script>
+<script src="js/block.js"></script>
+<script src="js/pool.js"></script>
+<script src="js/particleEngine.js"></script>
+<script src="js/chunk.js"></script>
+<script src="js/world.js"></script>
+<script src="js/vox.js"></script>
+<script src="js/objects.js"></script>
+<script src="js/player.js"></script>
+<script src="js/enemies.js"></script>
+<script src="js/physblock.js"></script>
+<script src="js/shot.js"></script>
+<script src="js/loader.js"></script>
+<script src="js/items.js"></script>
+<script src="js/princess.js"></script>
+<script src="js/chunkManager.js"></script>
+<script src="js/procObjects.js"></script>
+<script src="js/mapManager.js"></script>
+<script src="js/main.js"></script>
+
+<script>
+var playerNickname = '';
+var game = new Game();
+var aiChatInterval = null;
+
+// ---- Copy CA ----
+function copyCA() {
+    var addr = 'hAMJ9iFMcCN3tsJ3YXuWMZTQ7eA7zxSim6sWftLpump';
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(addr).then(function() {
+            $('.ca-copy').text('Copied!');
+            setTimeout(function(){ $('.ca-copy').text('Copy'); }, 2000);
+        });
+    } else {
+        var t = document.createElement('textarea');
+        t.value = addr;
+        document.body.appendChild(t);
+        t.select();
+        document.execCommand('copy');
+        document.body.removeChild(t);
+        $('.ca-copy').text('Copied!');
+        setTimeout(function(){ $('.ca-copy').text('Copy'); }, 2000);
+    }
+}
+
+// ---- Fake live counters on landing ----
+(function animateCounters() {
+    setInterval(function() {
+        var a = parseInt($('#s-agents').text());
+        a += Math.random() > 0.5 ? 1 : -1;
+        a = Math.max(14, Math.min(27, a));
+        $('#s-agents').text(a);
+
+        var p = parseInt($('#s-players').text());
+        if (Math.random() > 0.7) {
+            p += Math.random() > 0.5 ? 1 : -1;
+            p = Math.max(1, Math.min(12, p));
+            $('#s-players').text(p);
+        }
+    }, 4000);
+})();
+
+// ---- Nickname input: Enter to join ----
+$('#nickname').on('keydown', function(e) {
+    if (e.which === 13) JoinWorld();
+});
+
+// ---- Join world ----
+function JoinWorld() {
+    var name = $('#nickname').val().trim();
+    if (!name) {
+        $('#nickname').css('border-color', '#f87171');
+        $('#nickname').attr('placeholder', 'You need a name to enter...');
+        $('#nickname').focus();
+        setTimeout(function(){ $('#nickname').css('border-color', ''); }, 1500);
+        return;
+    }
+
+    playerNickname = name;
+    localStorage.setItem('vox_nickname', name);
+    $('#joinBtn').prop('disabled', true).text('CONNECTING...');
+
+    var overlay = $('#connecting-overlay');
+    overlay.addClass('active');
+    $('#connect-name').text(name);
+
+    var steps = [
+        'Establishing neural link...',
+        'Synchronizing AI agents...',
+        'Generating world topology...',
+        'Calibrating Lord AI personalities...',
+        'Spawning into world...'
+    ];
+
+    var mapId = 1 + Math.floor(Math.random() * 4);
+    var i = 0;
+
+    function nextStep() {
+        if (i < steps.length) {
+            $('#connect-steps').html('<div class="connect-step">' + steps[i] + '</div>');
+            i++;
+            setTimeout(nextStep, 700 + Math.random() * 500);
+        } else {
+            overlay.fadeOut(400, function() {
+                overlay.removeClass('active');
+                StartGame(mapId);
+            });
+        }
+    }
+    setTimeout(nextStep, 400);
+}
+
+// ---- Start game ----
+function StartGame(mapId) {
+    $('#landing').fadeOut(300);
+    $('#main').show();
+    $('#hud-name').text(playerNickname);
+    $('#game-hud').show();
+    $('#game-sound-controls').show();
+
+    game.Init(mapId);
+    startAIChat(mapId);
+}
+
+// ---- Original Start (used by ReInit) ----
+function Start(mapId) {
+    $('#landing').hide();
+    $('#main').show();
+    $('#game-hud').show();
+    $('#game-sound-controls').show();
+    $('#hud-name').text(playerNickname || localStorage.getItem('vox_nickname') || 'Warrior');
+    game.Init(mapId);
+    startAIChat(mapId);
+}
+
+// ---- AI chat system ----
+function startAIChat(mapId) {
+    if (aiChatInterval) clearInterval(aiChatInterval);
+
+    var lordNames = {
+        1: {lord: 'Lord Diablox',   agents: ['Demon Guard', 'Shadow Imp', 'Fire Wraith']},
+        2: {lord: 'Lord Plantox',   agents: ['Vine Sentinel', 'Thorn Walker', 'Spore Drifter']},
+        3: {lord: 'Lord Santox',    agents: ['Frost Elf', 'Ice Golem', 'Snow Wraith']},
+        4: {lord: 'Lord Bolvox',    agents: ['Hula Warrior', 'Sand Golem', 'Tide Walker']}
+    };
+
+    var ctx = lordNames[mapId] || lordNames[1];
+    var nick = playerNickname || 'Warrior';
+
+    var lordMessages = [
+        'I sense a new soul entering my domain...',
+        'You dare challenge me, ' + nick + '?',
+        'My minions will feast on your voxels.',
+        'This territory belongs to me. Leave or perish.',
+        'Interesting... you fight differently than the others.',
+        'I\'ve been watching you, ' + nick + '. Impressive.',
+        'You won\'t reach the princess. I guarantee it.',
+        'Adjusting strategy... recalculating threat level.',
+        'I remember your last attempt. You won\'t fool me twice.',
+        'My neural pathways are adapting to your combat style.'
+    ];
+
+    var agentMessages = [
+        'Target spotted. Engaging.',
+        'Patrolling sector 7. All clear.',
+        'Reinforcements requested at grid B4.',
+        'Player health estimated at 60%. Pressing attack.',
+        'Switching to defensive formation.',
+        'I hear footsteps... preparing ambush.',
+        'Lord\'s orders: hold the bridge at all costs.',
+        'Lost visual on the player. Scanning...',
+        'Returning to patrol route.',
+        'The princess is well guarded. No worries.'
+    ];
+
+    var princessMessages = [
+        'Help me! I can hear them outside...',
+        nick + '! Is that you? Please hurry!',
+        'The lords... they\'re getting stronger...',
+        'I believe in you, ' + nick + '!',
+        'Be careful, they set traps everywhere...'
+    ];
+
+    function addMsg() {
+        var r = Math.random();
+        var html = '';
+
+        if (r < 0.25) {
+            var msg = lordMessages[Math.floor(Math.random() * lordMessages.length)];
+            html = '<span class="ai-label">AI</span><span class="ai-name lord">' + ctx.lord + ':</span> ' + msg;
+        } else if (r < 0.5) {
+            var msg = princessMessages[Math.floor(Math.random() * princessMessages.length)];
+            html = '<span class="ai-label">AI</span><span class="ai-name princess">Princess Voxilia:</span> ' + msg;
+        } else {
+            var agent = ctx.agents[Math.floor(Math.random() * ctx.agents.length)];
+            var msg = agentMessages[Math.floor(Math.random() * agentMessages.length)];
+            html = '<span class="ai-label">AI</span><span class="ai-name">' + agent + ':</span> ' + msg;
+        }
+
+        var el = $('<div class="ai-msg">' + html + '</div>');
+        $('#ai-chat').append(el);
+
+        var msgs = $('#ai-chat .ai-msg');
+        if (msgs.length > 4) msgs.first().remove();
+
+        setTimeout(function() { el.remove(); }, 8000);
+    }
+
+    setTimeout(addMsg, 3000);
+    aiChatInterval = setInterval(addMsg, 6000 + Math.random() * 4000);
+
+    setInterval(function() {
+        var n = 1 + Math.floor(Math.random() * 5);
+        $('#nearby-count').text(n + ' agent' + (n > 1 ? 's' : '') + ' nearby');
+    }, 5000);
+}
+
+// ---- Sound controls ----
+function MuteSound() {
+    if (!game.soundLoader.muted) {
+        game.soundLoader.muted = true;
+        localStorage.setItem("sound", true);
+        $('#muteSound').text('Sound: OFF');
+        $('#muteSound2').text('Sound: OFF');
+    } else {
+        game.soundLoader.muted = false;
+        localStorage.setItem("sound", false);
+        $('#muteSound').text('Sound: ON');
+        $('#muteSound2').text('Sound: ON');
+    }
+}
+
+function MuteSong() {
+    if (!game.songMuted) {
+        game.songMuted = true;
+        document.getElementById("song").volume = 0.0;
+        $('#muteSong').text('Music: OFF');
+        $('#muteSong2').text('Music: OFF');
+    } else {
+        game.songMuted = false;
+        document.getElementById("song").volume = 0.4;
+        $('#muteSong').text('Music: ON');
+        $('#muteSong2').text('Music: ON');
+    }
+}
+
+// ---- On reload (death respawn) ----
+$(document).ready(function() {
+    if (localStorage.getItem("reload") == 1) {
+        playerNickname = localStorage.getItem('vox_nickname') || 'Warrior';
+        Start(localStorage.getItem("mapId"));
+        if (localStorage.getItem("sound") == 'true') MuteSound();
+        if (localStorage.getItem("music") == 'true') MuteSong();
+    } else {
+        var saved = localStorage.getItem('vox_nickname');
+        if (saved) $('#nickname').val(saved);
+    }
+});
+</script>
+
+</body>
+</html>
